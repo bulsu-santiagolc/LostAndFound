@@ -1,0 +1,28 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <!-- Buttons to switch between fragments -->
+    <Button
+        android:id="@+id/buttonShowUpload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Upload Item"
+        android:layout_alignParentTop="true"/>
+
+    <Button
+        android:id="@+id/buttonShowSearch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Search Item"
+        android:layout_below="@id/buttonShowUpload"/>
+
+    <!-- Container for fragments -->
+    <FrameLayout
+        android:id="@+id/fragmentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/buttonShowSearch"/>
+</RelativeLayout>

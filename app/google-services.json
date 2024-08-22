@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "620463683776",
+    "project_id": "visualsearchprototype",
+    "storage_bucket": "visualsearchprototype.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620463683776:android:6eb3336bc48b1153e15525",
+        "android_client_info": {
+          "package_name": "com.example.lostandfoundapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGMZcHsCBAyx3BUU6hiHn25zNlINakiRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
