@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -68,8 +69,8 @@ public class SearchItemFragment extends Fragment {
         recyclerView = view.findViewById(R.id.recyclerView);
 
         itemList = new ArrayList<>();
-        itemAdapter = new ItemAdapter(itemList);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        itemAdapter = new ItemAdapter(itemList, getContext());
         recyclerView.setAdapter(itemAdapter);
 
         searchButton.setOnClickListener(v -> searchByText());
@@ -120,7 +121,7 @@ public class SearchItemFragment extends Fragment {
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == PICK_IMAGE_REQUEST && data != null) {
@@ -147,23 +148,22 @@ public class SearchItemFragment extends Fragment {
                                 return;
                             }
 
-                            // Find the label with the highest confidence
-                            ImageLabel highestConfidenceLabel = labels.get(0);
-                            for (ImageLabel label : labels) {
-                                if (label.getConfidence() > highestConfidenceLabel.getConfidence()) {
-                                    highestConfidenceLabel = label;
-                                }
+                            // Sort labels by confidence score in descending order
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                labels.sort((l1, l2) -> Float.compare(l2.getConfidence(), l1.getConfidence()));
                             }
 
-                            // Get the label with the highest confidence
-                            String highestLabel = highestConfidenceLabel.getText();
-                            float confidence = highestConfidenceLabel.getConfidence();
-                            Log.d("Label", "Highest label: " + highestLabel + " with confidence: " + confidence);
+                            // Get the top 2 labels
+                            List<String> topLabels = new ArrayList<>();
+                            for (int i = 0; i < Math.min(2, labels.size()); i++) {
+                                topLabels.add(labels.get(i).getText());
+                            }
 
-                            // Use this label to search
-                            List<String> labelStrings = new ArrayList<>();
-                            labelStrings.add(highestLabel);
-                            searchByLabels(labelStrings);
+                            // Log the top labels
+                            Log.d("Label", "Top labels: " + topLabels);
+
+                            // Use the top 2 labels to search in Firestore
+                            searchByLabels(topLabels);
                         })
                         .addOnFailureListener(e -> {
                             Toast.makeText(getContext(), "Failed to label image", Toast.LENGTH_SHORT).show();
@@ -203,10 +203,10 @@ public class SearchItemFragment extends Fragment {
     }
 
     private void searchByLabels(List<String> labels) {
-        if (!labels.isEmpty()) {
+        if (labels != null && !labels.isEmpty()) {
             progressBar.setVisibility(View.VISIBLE);
             db.collection("items")
-                    .whereArrayContainsAny("labels", labels)
+                    .whereArrayContainsAny("labels", labels)  // Assuming Firestore stores labels as arrays
                     .get()
                     .addOnCompleteListener(task -> {
                         progressBar.setVisibility(View.GONE);
@@ -227,5 +227,17 @@ public class SearchItemFragment extends Fragment {
 
     private void displaySearchResults(List<Item> itemList) {
         itemAdapter.setItemList(itemList);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                captureImage();
+            } else {
+                Toast.makeText(getContext(), "Permission denied", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 }

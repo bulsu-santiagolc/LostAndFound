@@ -1,22 +1,27 @@
 package com.example.lostandfoundapp;
 
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.bumptech.glide.Glide;
-import java.text.SimpleDateFormat;
+
 import java.util.List;
-import java.util.Locale;
 
 public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder> {
-    private List<Item> itemList;
 
-    public ItemAdapter(List<Item> itemList) {
+    private List<Item> itemList;
+    private Context context;
+
+    public ItemAdapter(List<Item> itemList, Context context) {
         this.itemList = itemList;
+        this.context = context;
     }
 
     @NonNull
@@ -29,8 +34,14 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
     @Override
     public void onBindViewHolder(@NonNull ItemViewHolder holder, int position) {
         Item item = itemList.get(position);
-        holder.nameTextView.setText(item.getName());
-        holder.categoryTextView.setText(item.getCategory());
+        holder.itemName.setText(item.getName());
+        holder.itemCategory.setText(item.getCategory());
+        holder.itemDateAdded.setText(item.getDateAdded().toString());
+
+        // Load the image using Glide
+        Glide.with(context)
+                .load(item.getImageUrl()) // The URL for the image
+                .into(holder.itemImage); // The ImageView where the image will be loaded
     }
 
     @Override
@@ -40,16 +51,19 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
 
     public void setItemList(List<Item> itemList) {
         this.itemList = itemList;
-        notifyDataSetChanged();
+        notifyDataSetChanged(); // Refresh the RecyclerView
     }
 
-    static class ItemViewHolder extends RecyclerView.ViewHolder {
-        TextView nameTextView, categoryTextView;
+    public static class ItemViewHolder extends RecyclerView.ViewHolder {
+        ImageView itemImage;
+        TextView itemName, itemCategory, itemDateAdded;
 
         public ItemViewHolder(@NonNull View itemView) {
             super(itemView);
-            nameTextView = itemView.findViewById(R.id.itemName);
-            categoryTextView = itemView.findViewById(R.id.itemCategory);
+            itemImage = itemView.findViewById(R.id.itemImage);
+            itemName = itemView.findViewById(R.id.itemName);
+            itemCategory = itemView.findViewById(R.id.itemCategory);
+            itemDateAdded = itemView.findViewById(R.id.itemDateAdded);
         }
     }
 }

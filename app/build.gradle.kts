@@ -63,4 +63,9 @@ dependencies {
     implementation ("com.squareup.picasso:picasso:2.71828")
     implementation ("com.google.mlkit:image-labeling:17.0.9")
     implementation ("com.google.firebase:firebase-ml-vision:24.0.3")
+
+    implementation ("com.amazonaws:aws-android-sdk-core:2.42.0")
+    implementation ("com.amazonaws:aws-android-sdk-rekognition:2.42.0")
+
+
 }
