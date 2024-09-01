@@ -2,12 +2,23 @@
 1 Bag
 2 Stapler
 3 Bike
-4 Dog
-5 Pen
-6 Helmet
-7 Jacket
-8 Wallet
-9 Earphone
-10 Charger
-11 Laptop
-12 Mouse
+4 Pen
+5 Helmet
+6 Jacket
+7 Wallet
+8 Earphone
+9 Charger
+10 Laptop
+11 Mouse
+12 Keyboard
+13 Watch
+14 Bracelet
+15 Shirt
+16 Pants
+17 Shoes
+18 Umbrella
+19 ID Card
+20 Water Container
+21 Keys
+22 Eyeglasses
+23 Fan
