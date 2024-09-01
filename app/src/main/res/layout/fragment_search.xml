@@ -35,11 +35,27 @@
         android:layout_below="@id/captureImageButton"
         android:layout_marginTop="8dp"/>
 
+    <TextView
+        android:id="@+id/labelResults"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Label Result"
+        android:layout_below="@id/uploadImageButton"
+        android:layout_marginTop="8dp" />
+
+    <Button
+        android:id="@+id/submitImageSearchButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Submit"
+        android:layout_below="@id/labelResults"
+        android:layout_marginTop="8dp" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/uploadImageButton"
+        android:layout_below="@id/submitImageSearchButton"
         android:padding="8dp" />
 
     <ProgressBar

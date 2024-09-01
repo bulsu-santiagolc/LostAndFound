@@ -4,8 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -30,14 +30,15 @@ import androidx.fragment.app.Fragment;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
-import com.google.mlkit.vision.common.InputImage;
-import com.google.mlkit.vision.label.ImageLabel;
-import com.google.mlkit.vision.label.ImageLabeler;
-import com.google.mlkit.vision.label.ImageLabeling;
-import com.google.mlkit.vision.label.defaults.ImageLabelerOptions;
+
+import org.tensorflow.lite.DataType;
+import org.tensorflow.lite.Interpreter;
+import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -48,13 +49,19 @@ public class UploadItemFragment extends Fragment {
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int CAPTURE_IMAGE_REQUEST = 2;
     private static final int PERMISSION_REQUEST_CODE = 100;
+    private static final int IMAGE_SIZE = 224; // Adjust this based on your model's input size
     private Uri imageUri;
+    private Bitmap resizedBitmap; // Store resized bitmap
     private ImageView imageView;
     private EditText itemName, itemCategory;
     private TextView uploadStatus, labelResults;
     private ProgressBar progressBar;
     private FirebaseFirestore db;
     private StorageReference storageRef;
+
+    // TensorFlow Lite model and labels
+    private Interpreter tflite;
+    private List<String> labels;
 
     @Nullable
     @Override
@@ -82,38 +89,31 @@ public class UploadItemFragment extends Fragment {
             }
         });
 
+        // Initialize TensorFlow Lite model and labels
+        tflite = ((MyApplication) getActivity().getApplication()).getTflite();
+        labels = ((MyApplication) getActivity().getApplication()).getLabels();
+        if (labels != null && !labels.isEmpty()) {
+            Log.d("UploadItemFragment", "Labels loaded successfully: " + labels.toString());
+        } else {
+            Log.e("UploadItemFragment", "Labels failed to load or are empty.");
+        }
+
         return view;
     }
 
     private void checkPermissionsAndCapture() {
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-
-            ActivityCompat.requestPermissions(getActivity(), new String[]{
-                    Manifest.permission.CAMERA,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-            }, PERMISSION_REQUEST_CODE);
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.CAMERA}, PERMISSION_REQUEST_CODE);
         } else {
-            captureImage();
+            launchCamera();
         }
     }
 
-    private void captureImage() {
-        if (getActivity() == null) return;
-
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            File imageFile = new File(getActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES), "JPEG_" + timeStamp + ".jpg");
-            imageUri = FileProvider.getUriForFile(getContext(), getActivity().getPackageName() + ".provider", imageFile);
-
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
-            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-
-            Log.d("UploadItemFragment", "Starting camera intent");
-            startActivityForResult(intent, CAPTURE_IMAGE_REQUEST);
+    private void launchCamera() {
+        Log.d("UploadItemFragment", "Launching Camera");
+        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (cameraIntent.resolveActivity(getActivity().getPackageManager()) != null) {
+            startActivityForResult(cameraIntent, CAPTURE_IMAGE_REQUEST);
         } else {
             Toast.makeText(getContext(), "Camera not available", Toast.LENGTH_SHORT).show();
             Log.e("UploadItemFragment", "Camera not available");
@@ -130,54 +130,58 @@ public class UploadItemFragment extends Fragment {
         super.onActivityResult(requestCode, resultCode, data);
         Log.d("UploadItemFragment", "onActivityResult: requestCode = " + requestCode + ", resultCode = " + resultCode);
         if (resultCode == Activity.RESULT_OK) {
-            if (requestCode == PICK_IMAGE_REQUEST && data != null) {
-                imageUri = data.getData();
-                imageView.setImageURI(imageUri);
-            } else if (requestCode == CAPTURE_IMAGE_REQUEST) {
-                imageView.setImageURI(imageUri);
+            try {
+                if (requestCode == PICK_IMAGE_REQUEST && data != null) {
+                    imageUri = data.getData();
+                } else if (requestCode == CAPTURE_IMAGE_REQUEST && data != null) {
+                    // Get the captured image as a Bitmap
+                    Bitmap capturedImage = (Bitmap) data.getExtras().get("data");
+                    if (capturedImage != null) {
+                        imageUri = Uri.parse(MediaStore.Images.Media.insertImage(getContext().getContentResolver(), capturedImage, "Captured Image", null));
+                    } else {
+                        Toast.makeText(getContext(), "Error capturing image", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
+
+                // Load the image and resize it immediately after selection or capture
+                if (imageUri != null) {
+                    Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContext().getContentResolver(), imageUri);
+                    resizedBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_SIZE, IMAGE_SIZE, false);
+                    imageView.setImageBitmap(resizedBitmap); // Display the resized image
+                }
+
+            } catch (IOException e) {
+                Log.e("ImageProcessingError", "Error processing image", e);
+                Toast.makeText(getContext(), "Error processing image", Toast.LENGTH_SHORT).show();
             }
         }
     }
 
     private void labelAndUploadImage() {
-        if (imageUri != null) {
+        if (resizedBitmap != null) {
             try {
-                InputImage image = InputImage.fromFilePath(getContext(), imageUri);
-                ImageLabeler labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS);
-
                 progressBar.setVisibility(View.VISIBLE);
 
-                labeler.process(image)
-                        .addOnSuccessListener(labels -> {
-                            if (labels.isEmpty()) {
-                                labelResults.setText("No labels detected.");
-                                updateStatus("No labels detected", false);
-                                progressBar.setVisibility(View.GONE);
-                                return;
-                            }
+                // Run TensorFlow Lite model directly on the resized bitmap
+                String tfLiteLabel = classifyImage(resizedBitmap);
 
-                            // Sort labels by confidence score in descending order
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                labels.sort((l1, l2) -> Float.compare(l2.getConfidence(), l1.getConfidence()));
-                            }
+                // Extract just the label text, removing any leading numbers
+                String labelText = tfLiteLabel.replaceAll("^[0-9]+\\s+", "").toLowerCase(); // Remove numbers and trim
 
-                            // Get the top 2 labels
-                            List<String> topLabels = new ArrayList<>();
-                            for (int i = 0; i < Math.min(2, labels.size()); i++) {
-                                topLabels.add(labels.get(i).getText());
-                            }
+                // Display the TensorFlow Lite result in the labelResults TextView
+                labelResults.setText("TensorFlow Lite Label: " + labelText);
 
-                            labelResults.setText("Top Labels: " + topLabels);
-                            uploadImageAndDataToFirebase(topLabels);
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.e("LabelError", "Labeling failed", e);
-                            updateStatus("Failed to label image", false);
-                            progressBar.setVisibility(View.GONE);
-                        });
-            } catch (IOException e) {
-                Log.e("ImageProcessingError", "Error processing image", e);
-                Toast.makeText(getContext(), "Error processing image", Toast.LENGTH_SHORT).show();
+                // Use the TensorFlow Lite result as the label to upload to Firestore
+                List<String> tfLiteLabels = new ArrayList<>();
+                tfLiteLabels.add(labelText);
+
+                // Upload image and data to Firebase using TensorFlow Lite label
+                uploadImageAndDataToFirebase(tfLiteLabels);
+
+            } catch (Exception e) {
+                Log.e("ModelError", "Error running TensorFlow Lite model", e);
+                Toast.makeText(getContext(), "Model processing failed", Toast.LENGTH_SHORT).show();
                 progressBar.setVisibility(View.GONE);
             }
         } else {
@@ -185,6 +189,54 @@ public class UploadItemFragment extends Fragment {
         }
     }
 
+    private String classifyImage(Bitmap image) {
+        try {
+            // Ensure the labels are initialized
+            if (labels == null || labels.isEmpty()) {
+                throw new NullPointerException("Labels not initialized.");
+            }
+
+            TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, IMAGE_SIZE, IMAGE_SIZE, 3}, DataType.FLOAT32);
+            ByteBuffer byteBuffer = ByteBuffer.allocateDirect(4 * IMAGE_SIZE * IMAGE_SIZE * 3);
+            byteBuffer.order(ByteOrder.nativeOrder());
+
+            int[] intValues = new int[IMAGE_SIZE * IMAGE_SIZE];
+            image.getPixels(intValues, 0, image.getWidth(), 0, 0, image.getWidth(), image.getHeight());
+
+            int pixel = 0;
+            for (int i = 0; i < IMAGE_SIZE; i++) {
+                for (int j = 0; j < IMAGE_SIZE; j++) {
+                    int val = intValues[pixel++];
+                    byteBuffer.putFloat(((val >> 16) & 0xFF) * (1.f / 255.f));
+                    byteBuffer.putFloat(((val >> 8) & 0xFF) * (1.f / 255.f));
+                    byteBuffer.putFloat((val & 0xFF) * (1.f / 255.f));
+                }
+            }
+
+            inputFeature0.loadBuffer(byteBuffer);
+
+            TensorBuffer outputFeature0 = TensorBuffer.createFixedSize(new int[]{1, labels.size()}, DataType.FLOAT32);
+            tflite.run(inputFeature0.getBuffer(), outputFeature0.getBuffer());
+
+            float[] confidences = outputFeature0.getFloatArray();
+            int maxPos = 0;
+            float maxConfidence = 0;
+            for (int i = 0; i < confidences.length; i++) {
+                if (confidences[i] > maxConfidence) {
+                    maxConfidence = confidences[i];
+                    maxPos = i;
+                }
+            }
+
+            // Return the label with the highest confidence
+            return labels.get(maxPos);
+
+        } catch (Exception e) {
+            Log.e("ModelError", "Error running TensorFlow Lite model", e);
+            Toast.makeText(getContext(), "Model processing failed", Toast.LENGTH_SHORT).show();
+            return null;
+        }
+    }
 
     private void uploadImageAndDataToFirebase(List<String> labels) {
         StorageReference fileReference = storageRef.child("uploads/" + System.currentTimeMillis() + ".jpg");
@@ -207,8 +259,8 @@ public class UploadItemFragment extends Fragment {
     }
 
     private void saveItemData(String imageUrl, List<String> labels) {
-        String name = itemName.getText().toString().trim();
-        String category = itemCategory.getText().toString().trim();
+        String name = itemName.getText().toString().trim().toLowerCase(); // Normalize to lowercase
+        String category = itemCategory.getText().toString().trim().toLowerCase(); // Normalize to lowercase
         Date dateAdded = new Date();
 
         Item item = new Item(name, category, imageUrl, dateAdded, labels);
@@ -244,7 +296,7 @@ public class UploadItemFragment extends Fragment {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                captureImage();
+                launchCamera();
             } else {
                 Toast.makeText(getContext(), "Permission denied", Toast.LENGTH_SHORT).show();
             }

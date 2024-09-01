@@ -1,0 +1,13 @@
+0 Mobile Phone
+1 Bag
+2 Stapler
+3 Bike
+4 Dog
+5 Pen
+6 Helmet
+7 Jacket
+8 Wallet
+9 Earphone
+10 Charger
+11 Laptop
+12 Mouse
