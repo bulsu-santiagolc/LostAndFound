@@ -22,3 +22,16 @@
 21 Keys
 22 Eyeglasses
 23 Fan
+24 Lunchbox
+25 Calculator
+26 Rulers
+27 Flash Drive
+28 Guitar
+29 Violin
+30 Cosmetics
+31 Notebook/Books
+32 Baston
+33 Ball
+34 Racket
+35 Chessboard
+36 Shuttlecock
