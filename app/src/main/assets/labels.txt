@@ -33,5 +33,4 @@
 32 Racket
 33 Chessboard
 34 Shuttlecock
-35 Headphones
-36 Keys
+35 Comb
