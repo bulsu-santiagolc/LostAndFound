@@ -25,12 +25,11 @@
 24 Rulers
 25 Flash Drive
 26 Guitar
-27 Violin
-28 Cosmetics
-29 Notebook/Books
-30 Baston
-31 Ball
-32 Racket
-33 Chessboard
-34 Shuttlecock
-35 Comb
+27 Cosmetics
+28 Notebook/Books
+29 Baston
+30 Ball
+31 Racket
+32 Chessboard
+33 Shuttlecock
+34 Comb
